@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PostRequest;
 use App\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +39,7 @@ class PostController extends Controller
     }
 
 
-    public function store(Request $request)
+    public function store(PostRequest $request)
     {
         //dd($request);
 
@@ -60,6 +61,7 @@ class PostController extends Controller
         // сохраняем все в БД
         $post->save();
 
+        // делаем редирект и выводим flesh сообщение
         return redirect()->route('post.index')->with('success', 'Пост успешно добавлен!');
 
 
@@ -73,30 +75,47 @@ class PostController extends Controller
      */
     public function show($id)
     {
-        //
+        $post = Post::join('users', 'author_id', '=', 'users.id')
+            ->find($id);
+        $title = $post->title;
+        return view('posts.show', compact('post', 'title'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
+
     public function edit($id)
     {
-        //
+        $post = Post::find($id);
+
+        return view('posts.edit', compact('post'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
+
+    public function update(PostRequest $request, $id)
     {
-        //
+        $post = Post::find($id);
+
+        $post->title = $request->title;
+        $post->short_title = Str::length($request->title > 30 ? Str::substr($request->title, 0, 30) . '...' : $request->title);
+        $post->description = $request->description;
+
+        if ($request->file('img')) {
+            // перемещаем загруженный файл в папку
+            $path = Storage::putFile('public', $request->file('img'));
+            // сохраняем путь к загруженному файлу
+            $url = Storage::url($path);
+            // записываем путь к картинке в бд
+            $post->img = $url;
+        }
+
+        // обновляем все в БД
+        $post->update();
+
+        $id = $post->post_id;
+
+        // делаем редирект и выводим flesh сообщение
+        return redirect()->route('post.show', compact('id'))->with('success', 'Пост успешно обновлен!');
+
+
     }
 
     /**
@@ -107,6 +126,10 @@ class PostController extends Controller
      */
     public function destroy($id)
     {
-        //
+        // находим пост
+        $post = Post::find($id);
+        // удаляем пост
+        $post->delete();
+        return redirect()->route('post.index')->with('success', 'Пост успешно удален!');
     }
 }
